@@ -1,0 +1,24 @@
+[project]
+name = "ked-builder"
+version = "0.1.0"
+description = "A module for generating a catalog of elective courses based on educational programs"
+readme = "README.md"
+authors = [
+    { name = "Viktor Lopushnyanu", email = "nar1nariq@proton.me" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "python-docx>=1.2.0",
+]
+
+[project.scripts]
+ked-builder = "ked_builder:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.6",
+]
