@@ -1,4 +1,4 @@
-from generate_ked import build_ked
+from ked_builder.generate_ked import build_ked
 
 
 def main() -> None:
