@@ -8,6 +8,7 @@ from docx.text.paragraph import Paragraph
 from ked_builder.courses import Course, get_courses
 from ked_builder.results import get_results
 
+XLSX_DOC = "./documents/--УП-6В06150-ИТИИИ набор-2025 ОБНОВЛЕННЫЙ (1).xlsx"
 RU_DOC = "./documents/ОП_ИТиИИ[2025-2026] проверено 17.09.2025.docx"
 KZ_DOC = "./documents/ОП_ИТиИИ_КАЗ[2025-2026].docx"
 TEMPLATE_DOC = "./documents/ked_template.docx"
@@ -19,36 +20,6 @@ HEADING_ELECTIVES = "Элективті пәндердің сипаттамас�
 
 FONT_NAME = "Times New Roman"
 FONT_SIZE = Pt(11)
-
-# Ручные исключения {русское название: казахское название} для дисциплин,
-# которые не получается сопоставить автоматически по коду (см. docstring
-# get_courses в courses.py). Возникает почти у всех компонентов по выбору
-# этой программы - либо потому что несколько альтернативных дисциплин
-# делят один номер слота в коде, либо из-за ошибок в самих кодах казахской
-# версии документа (например, отсутствует числовая часть кода). Список ниже
-# сверен вручную по образцу "на печать КЭД ИТиИИ набор 2025".
-KK_OVERRIDES: dict[str, str] = {
-    "Основы финансовой грамотности": "Қаржылық сауаттылық негіздері",
-    "Экология и безопасность жизнедеятельности": "Экология және адам өмірінің қауіпсіздігі",
-    "Основы права и антикоррупционной культуры": "Құқық негіздері және сыбайлас жемқорлыққа қарсы мәдениет",
-    "Основы экономики и предпринимательства": "Экономика және кәсіпкерлік негіздері",
-    "Основы научных исследований": "Ғылыми зерттеулердің негіздері және академиялық хат",
-    "Организация вычислительных систем и сетей": "Есептеу жүйелері мен желілерін ұйымдастыру",
-    "Вычислительные системы, сети и телекоммуникации": "Есептеуіш жүйелер, желілер және телекоммуникциялар",
-    "Цифровая схемотехника": "Cандық схемалы",
-    "Цифровой маркетинг и информационные технологии: стратегии и приложения": "Сандық маркетинг және ақпараттық технологиялар: стратегиялар мен қосымшалар",
-    "ИТ-инструменты для маркетинга: таргетирование, аналитика, искусственный интеллект": "Маркетингке арналған АТ құралдары: мақсатты, аналитикалық, жасанды интеллект",
-    "Основы VR и AR": "VR және AR негіздері",
-    "Методы и подходы программирования": "Бағдарламалаудың әдістері мен тәсілдері",
-    "Системное программирование": "Жүйелік бағдарламалау",
-    "Основы робототехники": "Робототехника негіздері",
-    "Электроника": "Электроника",
-    # "Компоненты систем машинного зрения" в примере "на печать" тоже
-    # присутствует в каталоге, но в текущих исходных документах она отмечена
-    # как "Вузовский компонент", а не "Компонент по выбору" - поэтому в
-    # автоматически формируемый каталог она НЕ попадает. Если её нужно
-    # включить принудительно - смотрите комментарий в build_ked() ниже.
-}
 
 
 def format_requirements(
@@ -177,7 +148,7 @@ def _render_course_block(
         format_requirements(course.postrequisites, courses_by_number, "kz"),
     )
     anchor = _add_label_paragraph(anchor, "Оқу мақсаты:", course.goal_kk)
-    anchor = _add_label_paragraph(anchor, "Курстың қысқаша мазмұны:", course.summary)
+    anchor = _add_label_paragraph(anchor, "Курстың қысқаша мазмұны:", course.summary_kk)
     if course.results is not None:
         anchor = _add_label_paragraph(
             anchor,
@@ -218,12 +189,13 @@ def _render_course_block(
 
 
 def build_ked(
+    xlsx_doc: str = XLSX_DOC,
     ru_doc: str = RU_DOC,
     kz_doc: str = KZ_DOC,
     template_doc: str = TEMPLATE_DOC,
     output_doc: str = OUTPUT_DOC,
 ) -> None:
-    courses = get_courses(ru_doc, kz_doc, kk_overrides=KK_OVERRIDES)
+    courses = get_courses(xlsx_doc, ru_doc, kz_doc)
     results_ru = get_results(ru_doc)
     results_kz = get_results(kz_doc, "kz")
 
@@ -233,9 +205,14 @@ def build_ked(
     electives = [c for c in courses if c.is_elective]
 
     missing_kk = [c.name for c in electives if not c.name_kk]
+    missing_goal = [c.name for c in electives if not c.goal]
     if missing_kk:
-        print("Внимание: не найден казахский перевод для дисциплин:")
+        print("Внимание: нет казахского названия для дисциплин:")
         for name in missing_kk:
+            print(f"  - {name}")
+    if missing_goal:
+        print("Внимание: не найдено описание (goal/summary) для дисциплин:")
+        for name in missing_goal:
             print(f"  - {name}")
 
     doc = Document(template_doc)
@@ -248,7 +225,8 @@ def build_ked(
     if heading_paragraph is None:
         raise ValueError(f'Заголовок "{HEADING_ELECTIVES}" не найден в шаблоне')
 
-    anchor = heading_paragraph
+    anchor = _add_blank_paragraph(heading_paragraph)
+
     for course in electives:
         anchor = _render_course_block(
             anchor, course, courses_by_number, results_ru, results_kz

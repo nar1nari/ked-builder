@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "openpyxl>=3.1.5",
     "python-docx>=1.2.0",
 ]
 
