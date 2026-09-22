@@ -1,6 +1,6 @@
 [project]
 name = "ked-builder"
-version = "0.1.0"
+version = "1.0.0"
 description = "A module for generating a catalog of elective courses based on educational programs"
 readme = "README.md"
 authors = [
@@ -14,6 +14,9 @@ dependencies = [
 
 [project.scripts]
 ked-builder = "ked_builder:main"
+
+[tool.setuptools.package-data]
+ked_builder = ["documents/*.docx"]
 
 [build-system]
 requires = ["uv_build>=0.12.10,<0.13.0"]

@@ -6,13 +6,13 @@ from docx.shared import Pt
 from docx.text.paragraph import Paragraph
 
 from ked_builder.courses import Course, get_courses
+from ked_builder.professional_activity import fill_professional_activity_table
 from ked_builder.results import get_results
+from ked_builder.study_plan import insert_study_plan_tables
+from ked_builder.utils import replace_placeholders
 
-XLSX_DOC = "./documents/--УП-6В06150-ИТИИИ набор-2025 ОБНОВЛЕННЫЙ (1).xlsx"
-RU_DOC = "./documents/ОП_ИТиИИ[2025-2026] проверено 17.09.2025.docx"
-KZ_DOC = "./documents/ОП_ИТиИИ_КАЗ[2025-2026].docx"
-TEMPLATE_DOC = "./documents/ked_template.docx"
-OUTPUT_DOC = "./documents/КЭД_ИТиИИ_2025-2026.docx"
+from importlib.resources import files
+TEMPLATE_DOC = files("ked_builder").joinpath("templates/ked_template.docx")
 
 # Заголовок, после которого нужно вставить описание элективных дисциплин.
 # Ищем по вхождению подстроки, поэтому регистр и точная пунктуация не важны.
@@ -189,12 +189,27 @@ def _render_course_block(
 
 
 def build_ked(
-    xlsx_doc: str = XLSX_DOC,
-    ru_doc: str = RU_DOC,
-    kz_doc: str = KZ_DOC,
-    template_doc: str = TEMPLATE_DOC,
-    output_doc: str = OUTPUT_DOC,
+    year: int,
+    program_number: str,
+    program_name: str,
+    program_name_kk: str,
+    xlsx_doc: str,
+    ru_doc: str,
+    kz_doc: str,
+    output_doc: str,
+    template_doc: str = str(TEMPLATE_DOC),
 ) -> None:
+    """
+    :param year: год набора - подставляется вместо [YEAR], а [END_YEAR]/[YEAR_END]
+                 (в шаблоне используется написание "[END_YEAR]") вычисляется
+                 как год окончания 4-летнего обучения (year + 4)
+    :param program_number: код образовательной программы, например "6В06150" -
+                 подставляется вместо [PROGRAM_NUMBER]
+    :param program_name: название программы на русском - вместо [PROGRAM_NAME]
+    :param program_name_kk: название программы на казахском - вместо [PROGRAM_NAME_KK]
+    """
+    year_end = year + 4
+
     courses = get_courses(xlsx_doc, ru_doc, kz_doc)
     results_ru = get_results(ru_doc)
     results_kz = get_results(kz_doc, "kz")
@@ -217,6 +232,21 @@ def build_ked(
 
     doc = Document(template_doc)
 
+    replace_placeholders(
+        doc,
+        {
+            "[YEAR_END]": str(year_end),
+            "[END_YEAR]": str(year_end),
+            "[YEAR]": str(year),
+            "[PROGRAM_NUMBER]": program_number,
+            "[PROGRAM_NAME_KK]": program_name_kk,
+            "[PROGRAM_NAME]": program_name,
+        },
+    )
+
+    insert_study_plan_tables(doc, xlsx_doc)
+    fill_professional_activity_table(doc, ru_doc, kz_doc)
+
     heading_paragraph = None
     for p in doc.paragraphs:
         if HEADING_ELECTIVES in p.text:
@@ -225,8 +255,7 @@ def build_ked(
     if heading_paragraph is None:
         raise ValueError(f'Заголовок "{HEADING_ELECTIVES}" не найден в шаблоне')
 
-    anchor = _add_blank_paragraph(heading_paragraph)
-
+    anchor = heading_paragraph
     for course in electives:
         anchor = _render_course_block(
             anchor, course, courses_by_number, results_ru, results_kz
@@ -235,6 +264,3 @@ def build_ked(
     doc.save(output_doc)
     print(f"Сохранено: {output_doc} ({len(electives)} дисциплин)")
 
-
-if __name__ == "__main__":
-    build_ked()
