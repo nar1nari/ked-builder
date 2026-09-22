@@ -1,18 +1,67 @@
+import argparse
+
 from ked_builder.generate_ked import build_ked
 
+
 def main() -> None:
-    XLSX_DOC = "./documents/--УП-6В06150-ИТИИИ набор-2025 ОБНОВЛЕННЫЙ (1).xlsx"
-    RU_DOC = "./documents/ОП_ИТиИИ[2025-2026] проверено 17.09.2025.docx"
-    KZ_DOC = "./documents/ОП_ИТиИИ_КАЗ[2025-2026].docx"
-    OUTPUT_DOC = "./documents/КЭД_ИТиИИ_2025-2026.docx"
+    parser = argparse.ArgumentParser(description="Сгенерировать КЭД из ОП и УП")
+
+    parser.add_argument(
+        "--year",
+        type=int,
+        required=True,
+        help="Год начала образовательной программы.",
+    )
+    parser.add_argument(
+        "--program-number",
+        required=True,
+        help="Код образовательной программы.",
+    )
+    parser.add_argument(
+        "--program-name",
+        required=True,
+        help="Наименование образовательной программы на русском.",
+    )
+    parser.add_argument(
+        "--program-name-kk",
+        required=True,
+        help="Наименование образовательной программы на казахском.",
+    )
+    parser.add_argument(
+        "--xlsx-doc",
+        required=True,
+        help="Путь до xlsx документа УП",
+    )
+    parser.add_argument(
+        "--ru-doc",
+        required=True,
+        help="Путь до docx документа ОП.",
+    )
+    parser.add_argument(
+        "--kz-doc",
+        required=True,
+        help="Путь до документа ОП на казахском.",
+    )
+    parser.add_argument(
+        "--output-doc",
+        required=True,
+        help="Путь для сохранения КЭД.",
+    )
+    parser.add_argument(
+        "--template-doc",
+        help="Путь до шаблона КЭД. (опциональный)",
+    )
+
+    args = parser.parse_args()
 
     build_ked(
-        year=2025,
-        program_number="6В06150",
-        program_name="Информационные технологии и искусственный интеллект",
-        program_name_kk="Ақпараттық технологиялар және жасанды интеллект",
-        xlsx_doc=XLSX_DOC,
-        ru_doc=RU_DOC,
-        kz_doc=KZ_DOC,
-        output_doc=OUTPUT_DOC
+        year=args.year,
+        program_number=args.program_number,
+        program_name=args.program_name,
+        program_name_kk=args.program_name_kk,
+        xlsx_doc=args.xlsx_doc,
+        ru_doc=args.ru_doc,
+        kz_doc=args.kz_doc,
+        output_doc=args.output_doc,
+        template_doc=args.template_doc,
     )

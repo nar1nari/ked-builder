@@ -1,5 +1,5 @@
-import re
 import difflib
+import re
 
 import openpyxl
 from docx import Document
@@ -14,7 +14,7 @@ class Course:
         name_kk: str | None = None,
         code: str | None = None,
         code_kk: str | None = None,
-        credits: int | float | None = None,
+        credits: float | None = None,
         cycle: str | None = None,
         cycle_kk: str | None = None,
         module: str | None = None,
@@ -376,12 +376,18 @@ def get_courses(
     """
     courses = get_curriculum_courses(xlsx_path)
 
-    ru_details = get_course_details(ru_docx_path, HEADING_COURSES, with_results_and_component=True)
-    normalized_ru_details = {_normalize_name(name): entry for name, entry in ru_details.items()}
+    ru_details = get_course_details(
+        ru_docx_path, HEADING_COURSES, with_results_and_component=True
+    )
+    normalized_ru_details = {
+        _normalize_name(name): entry for name, entry in ru_details.items()
+    }
     normalized_ru_keys = list(normalized_ru_details.keys())
 
     numbers = get_course_numbers(ru_docx_path)
-    normalized_numbers = {_normalize_name(name): entry for name, entry in numbers.items()}
+    normalized_numbers = {
+        _normalize_name(name): entry for name, entry in numbers.items()
+    }
     normalized_number_keys = list(normalized_numbers.keys())
 
     kk_details: dict[str, dict] = {}
@@ -389,25 +395,33 @@ def get_courses(
     normalized_kk_keys: list[str] = []
     if kk_docx_path:
         kk_details = get_course_details(kk_docx_path, HEADING_COURSES_KK)
-        normalized_kk_details = {_normalize_name(name): entry for name, entry in kk_details.items()}
+        normalized_kk_details = {
+            _normalize_name(name): entry for name, entry in kk_details.items()
+        }
         normalized_kk_keys = list(normalized_kk_details.keys())
 
     for course in courses:
-        ru_entry = _lookup(course.name, ru_details, normalized_ru_details, normalized_ru_keys)
+        ru_entry = _lookup(
+            course.name, ru_details, normalized_ru_details, normalized_ru_keys
+        )  # ty: ignore[invalid-argument-type]
         if ru_entry:
             course.goal = ru_entry["goal"]
             course.summary = ru_entry["summary"]
             course.results = ru_entry["results"]
             course.component = ru_entry["component"]
 
-        number_entry = _lookup(course.name, numbers, normalized_numbers, normalized_number_keys)
+        number_entry = _lookup(
+            course.name, numbers, normalized_numbers, normalized_number_keys
+        )  # ty: ignore[invalid-argument-type]
         if number_entry:
             course.number = number_entry["number"]
             course.prerequisites = number_entry["prerequisites"]
             course.postrequisites = number_entry["postrequisites"]
 
         if kk_docx_path and course.name_kk:
-            kk_entry = _lookup(course.name_kk, kk_details, normalized_kk_details, normalized_kk_keys)
+            kk_entry = _lookup(
+                course.name_kk, kk_details, normalized_kk_details, normalized_kk_keys
+            )
             if kk_entry:
                 course.goal_kk = kk_entry["goal"]
                 course.summary_kk = kk_entry["summary"]

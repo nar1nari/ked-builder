@@ -1,3 +1,5 @@
+from importlib.resources import files
+
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
@@ -11,7 +13,6 @@ from ked_builder.results import get_results
 from ked_builder.study_plan import insert_study_plan_tables
 from ked_builder.utils import replace_placeholders
 
-from importlib.resources import files
 TEMPLATE_DOC = files("ked_builder").joinpath("templates/ked_template.docx")
 
 # Заголовок, после которого нужно вставить описание элективных дисциплин.
@@ -197,7 +198,7 @@ def build_ked(
     ru_doc: str,
     kz_doc: str,
     output_doc: str,
-    template_doc: str = str(TEMPLATE_DOC),
+    template_doc: str | None = None,
 ) -> None:
     """
     :param year: год набора - подставляется вместо [YEAR], а [END_YEAR]/[YEAR_END]
@@ -208,6 +209,10 @@ def build_ked(
     :param program_name: название программы на русском - вместо [PROGRAM_NAME]
     :param program_name_kk: название программы на казахском - вместо [PROGRAM_NAME_KK]
     """
+
+    if template_doc is None:
+        template_doc = str(TEMPLATE_DOC)
+
     year_end = year + 4
 
     courses = get_courses(xlsx_doc, ru_doc, kz_doc)
@@ -263,4 +268,3 @@ def build_ked(
 
     doc.save(output_doc)
     print(f"Сохранено: {output_doc} ({len(electives)} дисциплин)")
-

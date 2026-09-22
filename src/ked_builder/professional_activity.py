@@ -1,10 +1,10 @@
+from docx import Document
 from docx.document import Document as DocumentObject
 from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
-from docx import Document
 
 from ked_builder.utils import find_table_after_heading
 
