@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KED Builder</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #ffffff;
+    --accent: #4f46e5;
+    --accent-dark: #4338ca;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --error: #dc2626;
+    --success: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #312e81 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .card {
+    width: 100%;
+    max-width: 640px;
+    background: var(--card);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    padding: 40px;
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 26px;
+    color: var(--text);
+  }
+  p.subtitle {
+    margin: 0 0 28px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .field { margin-bottom: 18px; }
+  .field.full { grid-column: 1 / -1; }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  label .optional {
+    font-weight: 400;
+    color: var(--muted);
+  }
+  input[type="text"],
+  input[type="number"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    color: var(--text);
+    transition: border-color .15s;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  .file-drop {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    position: relative;
+    transition: border-color .15s, background .15s;
+  }
+  .file-drop:hover { border-color: var(--accent); background: #f5f5ff; }
+  .file-drop input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .file-drop .name {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin: 28px 0 12px;
+    font-weight: 700;
+  }
+  button {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background .15s, transform .05s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { background: #a5b4fc; cursor: not-allowed; }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: none;
+  }
+  button.loading .spinner { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .msg {
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    display: none;
+  }
+  .msg.error { display: block; background: #fef2f2; color: var(--error); border: 1px solid #fecaca; }
+  .msg.success { display: block; background: #f0fdf4; color: var(--success); border: 1px solid #bbf7d0; }
+  @media (max-width: 520px) {
+    .grid { grid-template-columns: 1fr; }
+    .card { padding: 28px 20px; }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Генератор КЭД</h1>
+    <p class="subtitle">Загрузите документы, заполните данные программы и получите готовый .docx</p>
+
+    <form id="ked-form">
+      <div class="section-title">Данные программы</div>
+      <div class="grid">
+        <div class="field">
+          <label for="year">Год набора</label>
+          <input type="number" id="year" name="year" required placeholder="2025">
+        </div>
+        <div class="field">
+          <label for="program_number">Номер программы</label>
+          <input type="text" id="program_number" name="program_number" required placeholder="6В06150">
+        </div>
+        <div class="field full">
+          <label for="program_name">Название программы (рус.)</label>
+          <input type="text" id="program_name" name="program_name" required>
+        </div>
+        <div class="field full">
+          <label for="program_name_kk">Название программы (қаз.)</label>
+          <input type="text" id="program_name_kk" name="program_name_kk" required>
+        </div>
+      </div>
+
+      <div class="section-title">Файлы</div>
+      <div class="field full">
+        <label for="ru_doc">Документ на русском</label>
+        <div class="file-drop" data-target="ru_doc"><span class="text">Выберите файл (.docx)</span>
+          <input type="file" id="ru_doc" name="ru_doc" accept=".docx" required>
+        </div>
+      </div>
+      <div class="field full">
+        <label for="kz_doc">Документ на казахском</label>
+        <div class="file-drop" data-target="kz_doc"><span class="text">Выберите файл (.docx)</span>
+          <input type="file" id="kz_doc" name="kz_doc" accept=".docx" required>
+        </div>
+      </div>
+      <div class="field full">
+        <label for="xlsx_doc">Учебный план (Excel)</label>
+        <div class="file-drop" data-target="xlsx_doc"><span class="text">Выберите файл (.xlsx)</span>
+          <input type="file" id="xlsx_doc" name="xlsx_doc" accept=".xlsx" required>
+        </div>
+      </div>
+      <div class="field full">
+        <label for="template_doc">Шаблон <span class="optional">(необязательно)</span></label>
+        <div class="file-drop" data-target="template_doc"><span class="text">Выберите файл (.docx)</span>
+          <input type="file" id="template_doc" name="template_doc" accept=".docx">
+        </div>
+      </div>
+
+      <button type="submit" id="submit-btn">
+        <span class="spinner"></span>
+        <span class="label">Сгенерировать и скачать</span>
+      </button>
+
+      <div class="msg error" id="error-msg"></div>
+      <div class="msg success" id="success-msg"></div>
+    </form>
+  </div>
+
+<script>
+document.querySelectorAll('.file-drop').forEach((drop) => {
+  const input = drop.querySelector('input[type="file"]');
+  const label = drop.querySelector('.text');
+  const defaultText = label.textContent;
+  input.addEventListener('change', () => {
+    label.textContent = input.files.length
+      ? input.files[0].name
+      : defaultText;
+    label.classList.toggle('name', input.files.length > 0);
+  });
+});
+
+const form = document.getElementById('ked-form');
+const btn = document.getElementById('submit-btn');
+const errorMsg = document.getElementById('error-msg');
+const successMsg = document.getElementById('success-msg');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorMsg.style.display = 'none';
+  successMsg.style.display = 'none';
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  const formData = new FormData(form);
+  // Не отправляем пустой input для необязательного шаблона.
+  const templateInput = document.getElementById('template_doc');
+  if (!templateInput.files.length) {
+    formData.delete('template_doc');
+  }
+
+  try {
+    const response = await fetch('/generate', { method: 'POST', body: formData });
+
+    if (!response.ok) {
+      let detail = 'Не удалось сгенерировать документ.';
+      try {
+        const data = await response.json();
+        detail = data.detail || detail;
+      } catch (_) {}
+      throw new Error(detail);
+    }
+
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?([^"]+)"?/);
+    const filename = match ? match[1] : 'ked_output.docx';
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    successMsg.textContent = 'Готово! Файл скачивается: ' + filename;
+    successMsg.style.display = 'block';
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+});
+</script>
+</body>
+</html>
