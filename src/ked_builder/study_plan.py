@@ -1,4 +1,3 @@
-from ked_builder.utils import find_paragraph
 import re
 
 import openpyxl
@@ -12,12 +11,14 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 
 from ked_builder.courses import _CODE_ROW_PATTERN, _split_code, _split_trilingual
+from ked_builder.utils import find_paragraph
 
 FONT_NAME = "Times New Roman"
 FONT_SIZE = Pt(10)
 
 # ширины столбцов (EMU) - пропорции взяты из таблицы образца "на печать КЭД",
-# столбец "Цикл" чуть расширен, чтобы в нём помещалась буква "л"
+# столбец "Цикл" чуть расширен, чтобы в нём помещалась буква "л" в словах
+# вроде "БД ВК" без переноса
 COLUMN_WIDTHS = [520000, 1477710, 628015, 2535555, 795655]
 
 HEADER_ROW = [
@@ -40,6 +41,17 @@ _COMPONENT_BY_CYCLE_SUFFIX = [
 ]
 
 
+# двухбуквенные обозначения типа компонента в конце сокращения цикла
+# (казахские МК/ТК/ЖК и русские ОК/КВ/ВК) - в столбце "Цикл" таблицы
+# они не нужны, тип компонента и так показан отдельной строкой-заголовком
+_COMPONENT_SUFFIX_PATTERN = re.compile(r"\s+(МК|ТК|ЖК|ОК|КВ|ВК)$")
+
+
+def _strip_component_suffix(cycle: str) -> str:
+    """"ЖББП МК" -> "ЖББП", "ООД ОК" -> "ООД", "ҚА" -> "ҚА"."""
+    return _COMPONENT_SUFFIX_PATTERN.sub("", cycle.strip())
+
+
 def _component_from_cycle(cycle_ru: str) -> tuple[str, str]:
     """Определяет (компонент на русском, компонент на казахском) по сокращению цикла."""
     cycle_ru = cycle_ru.strip()
@@ -56,7 +68,7 @@ def get_study_plan(xlsx_path: str) -> dict[int, list[dict]]:
     Каждая строка - один из трёх видов:
         {"type": "semester", "number": int, "credits": int|None}
         {"type": "component", "label_ru": str, "label_kk": str, "credits": int}
-        {"type": "discipline", "cycle_ru", "module_kk", "module_ru",
+        {"type": "discipline", "cycle_kk", "cycle_ru", "module_kk", "module_ru",
          "code_kk", "code_ru", "name_kk", "name_ru", "credits"}
 
     Итог по кредитам внутри компонента считается суммой кредитов всех его
@@ -90,7 +102,7 @@ def get_study_plan(xlsx_path: str) -> dict[int, list[dict]]:
                 credits = credits_raw
                 last_credits = credits_raw
 
-            _, cycle_ru, _ = _split_trilingual(cycle_raw or "")
+            cycle_kk, cycle_ru, _ = _split_trilingual(cycle_raw or "")
             module_kk, module_ru, _ = _split_trilingual(last_module_raw or "")
             name_kk, name_ru, _ = _split_trilingual(name_raw)
             code_ru, code_kk = _split_code(code_raw)
@@ -101,6 +113,7 @@ def get_study_plan(xlsx_path: str) -> dict[int, list[dict]]:
             events.append(
                 {
                     "type": "discipline",
+                    "cycle_kk": cycle_kk,
                     "cycle_ru": cycle_ru,
                     "module_kk": module_kk,
                     "module_ru": module_ru,
@@ -180,11 +193,7 @@ def get_study_plan(xlsx_path: str) -> dict[int, list[dict]]:
 
             if current_year is not None:
                 plan[current_year].append(
-                    {
-                        "type": "semester",
-                        "number": semester_number,
-                        "credits": ev["credits"],
-                    }
+                    {"type": "semester", "number": semester_number, "credits": ev["credits"]}
                 )
                 for group in semester_groups:
                     plan[current_year].append(
@@ -307,7 +316,9 @@ def render_study_plan_table(
             _set_cell_text(cells[4], str(row_data["credits"] or ""), bold=True)
 
         else:  # discipline
-            _set_cell_text(cells[0], row_data["cycle_ru"])
+            cycle_kk = _strip_component_suffix(row_data["cycle_kk"])
+            cycle_ru = _strip_component_suffix(row_data["cycle_ru"])
+            _set_cell_text(cells[0], f"{cycle_kk}/{cycle_ru}")
             _set_cell_text(cells[1], f"{row_data['module_kk']}/{row_data['module_ru']}")
             _set_cell_text(cells[2], f"{row_data['code_kk']}/{row_data['code_ru']}")
             _set_cell_text(cells[3], f"{row_data['name_kk']} / {row_data['name_ru']}")
@@ -329,6 +340,6 @@ def insert_study_plan_tables(doc: DocumentObject, xlsx_path: str) -> None:
         heading_needle = f"{course_year} курсына арналған оқу жоспары"
         heading_paragraph = find_paragraph(doc, heading_needle)
         if heading_paragraph is None:
-            raise ValueError(f"Заголовок для {course_year} курса не найден в шаблоне")
+            raise ValueError(f'Заголовок для {course_year} курса не найден в шаблоне')
 
         render_study_plan_table(doc, heading_paragraph, plan[course_year])
