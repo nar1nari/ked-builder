@@ -11,7 +11,7 @@ from ked_builder.courses import Course, get_courses
 from ked_builder.professional_activity import fill_professional_activity_table
 from ked_builder.results import get_results
 from ked_builder.study_plan import insert_study_plan_tables
-from ked_builder.utils import replace_placeholders
+from ked_builder.utils import replace_placeholders, find_paragraph
 
 TEMPLATE_DOC = files("ked_builder").joinpath("templates/ked_template.docx")
 
@@ -252,11 +252,7 @@ def build_ked(
     insert_study_plan_tables(doc, xlsx_doc)
     fill_professional_activity_table(doc, ru_doc, kz_doc)
 
-    heading_paragraph = None
-    for p in doc.paragraphs:
-        if HEADING_ELECTIVES in p.text:
-            heading_paragraph = p
-            break
+    heading_paragraph = find_paragraph(doc, HEADING_ELECTIVES)
     if heading_paragraph is None:
         raise ValueError(f'Заголовок "{HEADING_ELECTIVES}" не найден в шаблоне')
 

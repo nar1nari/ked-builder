@@ -1,3 +1,4 @@
+from ked_builder.utils import find_paragraph
 import re
 
 import openpyxl
@@ -326,11 +327,7 @@ def insert_study_plan_tables(doc: DocumentObject, xlsx_path: str) -> None:
 
     for course_year in (1, 2, 3, 4):
         heading_needle = f"{course_year} курсына арналған оқу жоспары"
-        heading_paragraph = None
-        for p in doc.paragraphs:
-            if heading_needle in p.text:
-                heading_paragraph = p
-                break
+        heading_paragraph = find_paragraph(doc, heading_needle)
         if heading_paragraph is None:
             raise ValueError(f"Заголовок для {course_year} курса не найден в шаблоне")
 

@@ -6,7 +6,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
 
-from ked_builder.utils import find_table_after_heading
+from ked_builder.utils import find_table_after_heading, text_contains
 
 HEADING_RU = "Модель выпускника и квалификационная"
 HEADING_KK = "Түлек моделі және біліктілік сипаттамасы"
@@ -100,7 +100,7 @@ def fill_professional_activity_table(
 
     target_table = None
     for table in doc.tables:
-        if table.rows and "Кәсіби қызмет саласы" in table.rows[0].cells[0].text:
+        if table.rows and text_contains(table.rows[0].cells[0].text, "Кәсіби қызмет саласы"):
             target_table = table
             break
     if target_table is None:
