@@ -48,7 +48,7 @@ _COMPONENT_SUFFIX_PATTERN = re.compile(r"\s+(МК|ТК|ЖК|ОК|КВ|ВК)$")
 
 
 def _strip_component_suffix(cycle: str) -> str:
-    """"ЖББП МК" -> "ЖББП", "ООД ОК" -> "ООД", "ҚА" -> "ҚА"."""
+    """ "ЖББП МК" -> "ЖББП", "ООД ОК" -> "ООД", "ҚА" -> "ҚА"."""
     return _COMPONENT_SUFFIX_PATTERN.sub("", cycle.strip())
 
 
@@ -193,7 +193,11 @@ def get_study_plan(xlsx_path: str) -> dict[int, list[dict]]:
 
             if current_year is not None:
                 plan[current_year].append(
-                    {"type": "semester", "number": semester_number, "credits": ev["credits"]}
+                    {
+                        "type": "semester",
+                        "number": semester_number,
+                        "credits": ev["credits"],
+                    }
                 )
                 for group in semester_groups:
                     plan[current_year].append(
@@ -340,6 +344,6 @@ def insert_study_plan_tables(doc: DocumentObject, xlsx_path: str) -> None:
         heading_needle = f"{course_year} курсына арналған оқу жоспары"
         heading_paragraph = find_paragraph(doc, heading_needle)
         if heading_paragraph is None:
-            raise ValueError(f'Заголовок для {course_year} курса не найден в шаблоне')
+            raise ValueError(f"Заголовок для {course_year} курса не найден в шаблоне")
 
         render_study_plan_table(doc, heading_paragraph, plan[course_year])

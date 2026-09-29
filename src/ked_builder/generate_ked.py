@@ -1,7 +1,7 @@
 from importlib.resources import files
 
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
@@ -11,7 +11,7 @@ from ked_builder.courses import Course, get_courses
 from ked_builder.professional_activity import fill_professional_activity_table
 from ked_builder.results import get_results
 from ked_builder.study_plan import insert_study_plan_tables
-from ked_builder.utils import replace_placeholders, find_paragraph
+from ked_builder.utils import find_paragraph, replace_placeholders
 
 TEMPLATE_DOC = files("ked_builder").joinpath("templates/ked_template.docx")
 
@@ -100,10 +100,17 @@ def _add_blank_paragraph(anchor: Paragraph) -> Paragraph:
     return _insert_paragraph_after(anchor)
 
 
-def _add_label_paragraph(anchor: Paragraph, label: str, text: str | None) -> Paragraph:
+def _add_label_paragraph(
+    anchor: Paragraph, label: str, text: str | None, highlight_missing: bool = False
+) -> Paragraph:
     """
     Строка вида "[TAB] **Метка:** текст" - таб-отступ, жирная метка,
     обычный текст после неё, весь абзац выровнен по ширине.
+
+    Если highlight_missing=True и text пуст, вместо пропуска значения
+    печатается "None" с красной заливкой - сигнал автору документа, что для
+    дисциплины не нашёлся преподаватель и поле нужно заполнить вручную
+    (используется для "Руководитель программы"/"Бағдарлама жетекшісі").
     """
     p = _insert_paragraph_after(anchor)
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -118,6 +125,10 @@ def _add_label_paragraph(anchor: Paragraph, label: str, text: str | None) -> Par
     if text:
         text_run = p.add_run(" " + text)
         _set_run_font(text_run)
+    elif highlight_missing:
+        missing_run = p.add_run(" None")
+        _set_run_font(missing_run)
+        missing_run.font.highlight_color = WD_COLOR_INDEX.RED
 
     return p
 
@@ -156,7 +167,9 @@ def _render_course_block(
             "Оқыту нәтижесі:",
             " ".join(results_kz.get(r, r) for r in course.results),
         )
-    anchor = _add_label_paragraph(anchor, "Бағдарлама жетекшісі:", course.mentor)
+    anchor = _add_label_paragraph(
+        anchor, "Бағдарлама жетекшісі:", course.mentor_kk, highlight_missing=True
+    )
     anchor = _add_label_paragraph(anchor, "Кафедра:", course.department)
     anchor = _add_blank_paragraph(anchor)
 
@@ -182,7 +195,9 @@ def _render_course_block(
             "Результаты обучения:",
             " ".join(results_ru.get(r, r) for r in course.results),
         )
-    anchor = _add_label_paragraph(anchor, "Руководитель программы:", course.mentor)
+    anchor = _add_label_paragraph(
+        anchor, "Руководитель программы:", course.mentor, highlight_missing=True
+    )
     anchor = _add_label_paragraph(anchor, "Кафедра:", course.department)
     anchor = _add_blank_paragraph(anchor)
 
@@ -199,6 +214,7 @@ def build_ked(
     kz_doc: str,
     output_doc: str,
     template_doc: str | None = None,
+    pps_doc: str | None = None,
 ) -> None:
     """
     :param year: год набора - подставляется вместо [YEAR], а [END_YEAR]/[YEAR_END]
@@ -206,8 +222,18 @@ def build_ked(
                  как год окончания 4-летнего обучения (year + 4)
     :param program_number: код образовательной программы, например "6В06150" -
                  подставляется вместо [PROGRAM_NUMBER]
-    :param program_name: название программы на русском - вместо [PROGRAM_NAME]
+    :param program_name: название программы на русском - вместо [PROGRAM_NAME],
+                 а также название специальности, по которому в файле ППС
+                 (pps_doc) ищутся преподаватели
     :param program_name_kk: название программы на казахском - вместо [PROGRAM_NAME_KK]
+    :param pps_doc: (опционально) путь до файла ППС - для каждой дисциплины
+                 из него подбираются mentor/mentor_kk (преподаватели на русском
+                 и на казахском могут отличаться). Файл необязателен: если его
+                 не передать, у всех дисциплин будет "Руководитель программы:
+                 None", выделенное красным - как подсказка, что поле нужно
+                 заполнить вручную. Красным выделяется и None для отдельных
+                 дисциплин, для которых преподаватель не нашёлся в файле ППС -
+                 это нормальная ситуация, а не ошибка.
     """
 
     if template_doc is None:
@@ -215,7 +241,9 @@ def build_ked(
 
     year_end = year + 4
 
-    courses = get_courses(xlsx_doc, ru_doc, kz_doc)
+    courses = get_courses(
+        xlsx_doc, ru_doc, kz_doc, pps_xlsx_path=pps_doc, program_name=program_name
+    )
     results_ru = get_results(ru_doc)
     results_kz = get_results(kz_doc, "kz")
 
@@ -226,6 +254,7 @@ def build_ked(
 
     missing_kk = [c.name for c in electives if not c.name_kk]
     missing_goal = [c.name for c in electives if not c.goal]
+    missing_mentor = [c.name for c in electives if not c.mentor or not c.mentor_kk]
     if missing_kk:
         print("Внимание: нет казахского названия для дисциплин:")
         for name in missing_kk:
@@ -233,6 +262,10 @@ def build_ked(
     if missing_goal:
         print("Внимание: не найдено описание (goal/summary) для дисциплин:")
         for name in missing_goal:
+            print(f"  - {name}")
+    if missing_mentor:
+        print("Внимание: не найден преподаватель (mentor/mentor_kk) для дисциплин:")
+        for name in missing_mentor:
             print(f"  - {name}")
 
     doc = Document(template_doc)

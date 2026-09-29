@@ -100,7 +100,9 @@ def fill_professional_activity_table(
 
     target_table = None
     for table in doc.tables:
-        if table.rows and text_contains(table.rows[0].cells[0].text, "Кәсіби қызмет саласы"):
+        if table.rows and text_contains(
+            table.rows[0].cells[0].text, "Кәсіби қызмет саласы"
+        ):
             target_table = table
             break
     if target_table is None:

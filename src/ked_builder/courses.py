@@ -4,13 +4,14 @@ import re
 import openpyxl
 from docx import Document
 
+from ked_builder.faculty import get_faculty_index
 from ked_builder.utils import find_table_after_heading
 
 
 class Course:
     def __init__(
         self,
-        name: str | None = None,
+        name: str,
         name_kk: str | None = None,
         code: str | None = None,
         code_kk: str | None = None,
@@ -28,6 +29,7 @@ class Course:
         summary_kk: str | None = None,
         results: list[str] | None = None,
         mentor: str | None = None,
+        mentor_kk: str | None = None,
         department: str | None = None,
         component: str | None = None,
     ):
@@ -49,6 +51,7 @@ class Course:
         self.summary_kk = summary_kk
         self.results = results
         self.mentor = mentor
+        self.mentor_kk = mentor_kk
         self.department = department
         # тип компонента дисциплины, например "Обязательный компонент",
         # "Вузовский компонент" или "Компонент по выбору" - берётся из
@@ -360,6 +363,8 @@ def get_courses(
     xlsx_path: str,
     ru_docx_path: str,
     kk_docx_path: str | None = None,
+    pps_xlsx_path: str | None = None,
+    program_name: str | None = None,
 ) -> list[Course]:
     """
     Собирает итоговый список дисциплин:
@@ -367,7 +372,15 @@ def get_courses(
       из учебного плана (xlsx_path), это основной источник истины;
     - goal/summary/results/component/number/prerequisites/postrequisites -
       из русского документа ОП (ru_docx_path);
-    - goal_kk/summary_kk - из казахского документа ОП (kk_docx_path), если передан.
+    - goal_kk/summary_kk - из казахского документа ОП (kk_docx_path), если передан;
+    - mentor/mentor_kk - из файла ППС (pps_xlsx_path), если передан. Для
+      каждой дисциплины преподаватель на русском и на казахском ищется
+      отдельно - группа в ППС может вестись на любом из языков, и
+      преподаватели могут отличаться. Для поиска по файлу ППС обязательно
+      нужен program_name - название образовательной программы (специальности),
+      как оно записано в самом файле ППС. Если преподаватель для дисциплины
+      не найден - mentor/mentor_kk остаются None, это нормальная ситуация.
+      Если pps_xlsx_path не передан - mentor/mentor_kk у всех дисциплин None.
 
     Между документами дисциплины сопоставляются НЕ по точному совпадению
     названия (в учебном плане и документах ОП формулировки могут немного
@@ -375,6 +388,16 @@ def get_courses(
     по написанию совпадение).
     """
     courses = get_curriculum_courses(xlsx_path)
+
+    faculty_index = None
+    if pps_xlsx_path:
+        if not program_name:
+            raise ValueError(
+                "Для поиска преподавателей (pps_xlsx_path) нужно передать "
+                "program_name - название образовательной программы, как оно "
+                "записано в файле ППС"
+            )
+        faculty_index = get_faculty_index(pps_xlsx_path, program_name)
 
     ru_details = get_course_details(
         ru_docx_path, HEADING_COURSES, with_results_and_component=True
@@ -403,7 +426,7 @@ def get_courses(
     for course in courses:
         ru_entry = _lookup(
             course.name, ru_details, normalized_ru_details, normalized_ru_keys
-        )  # ty: ignore[invalid-argument-type]
+        )
         if ru_entry:
             course.goal = ru_entry["goal"]
             course.summary = ru_entry["summary"]
@@ -412,7 +435,7 @@ def get_courses(
 
         number_entry = _lookup(
             course.name, numbers, normalized_numbers, normalized_number_keys
-        )  # ty: ignore[invalid-argument-type]
+        )
         if number_entry:
             course.number = number_entry["number"]
             course.prerequisites = number_entry["prerequisites"]
@@ -425,5 +448,9 @@ def get_courses(
             if kk_entry:
                 course.goal_kk = kk_entry["goal"]
                 course.summary_kk = kk_entry["summary"]
+
+        if faculty_index is not None:
+            course.mentor = faculty_index.find_mentor(course.name)
+            course.mentor_kk = faculty_index.find_mentor(course.name_kk)
 
     return courses

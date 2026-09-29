@@ -51,6 +51,10 @@ def main() -> None:
         "--template-doc",
         help="Путь до шаблона КЭД. (опциональный)",
     )
+    parser.add_argument(
+        "--pps-doc",
+        help="Путь до файла ППС (опциональный).",
+    )
 
     args = parser.parse_args()
 
@@ -64,4 +68,5 @@ def main() -> None:
         kz_doc=args.kz_doc,
         output_doc=args.output_doc,
         template_doc=args.template_doc,
+        pps_doc=args.pps_doc,
     )
