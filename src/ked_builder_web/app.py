@@ -1,3 +1,4 @@
+from ked_builder.program_info import get_program_year, get_program_code, get_program_name, get_program_name_kk
 import shutil
 import tempfile
 import traceback
@@ -47,6 +48,7 @@ async def generate(
     ru_doc: UploadFile = File(...),
     kz_doc: UploadFile = File(...),
     xlsx_doc: UploadFile = File(...),
+    pps_doc: UploadFile | None = File(None),
     template_doc: UploadFile | None = File(None),
 ):
     session_dir = UPLOAD_ROOT / uuid.uuid4().hex
@@ -56,6 +58,11 @@ async def generate(
         ru_path = _save_upload(ru_doc, session_dir)
         kz_path = _save_upload(kz_doc, session_dir)
         xlsx_path = _save_upload(xlsx_doc, session_dir)
+        pps_path = (
+            _save_upload(pps_doc, session_dir)
+            if pps_doc is not None and pps_doc.filename
+            else None
+        )
         template_path = (
             _save_upload(template_doc, session_dir)
             if template_doc is not None and template_doc.filename
@@ -74,6 +81,7 @@ async def generate(
             kz_doc=kz_path,
             output_doc=str(output_path),
             template_doc=template_path,
+            pps_doc=pps_path,
         )
 
         if not output_path.exists():
@@ -96,3 +104,34 @@ async def generate(
             status_code=400,
             content={"detail": f"Не удалось сгенерировать документ: {exc}"},
         )
+
+def _read_plan_info(xlsx_path: str) -> dict:
+    return {
+        "year": get_program_year(xlsx_path),
+        "program_number": get_program_code(xlsx_path),
+        "program_name": get_program_name(xlsx_path),
+        "program_name_kk": get_program_name_kk(xlsx_path),
+    }
+
+
+@app.post("/parse-plan")
+async def parse_plan(xlsx_doc: UploadFile = File(...)):
+    session_dir = UPLOAD_ROOT / uuid.uuid4().hex
+    session_dir.mkdir(parents=True)
+    try:
+        path = _save_upload(xlsx_doc, session_dir)
+        info = _read_plan_info(path)
+        return {
+            "year": info.get("year"),
+            "program_number": info.get("program_number"),
+            "program_name": info.get("program_name"),
+            "program_name_kk": info.get("program_name_kk"),
+        }
+    except Exception as exc:
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=400,
+            content={"detail": f"Не удалось прочитать учебный план: {exc}"},
+        )
+    finally:
+        _cleanup(session_dir)

@@ -48,9 +48,9 @@
   .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 8px;
   }
-  .field { margin-bottom: 18px; }
+  .field { margin-bottom: 10px; }
   .field.full { grid-column: 1 / -1; }
   label {
     display: block;
@@ -145,6 +145,9 @@
     .grid { grid-template-columns: 1fr; }
     .card { padding: 28px 20px; }
   }
+  .hint { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .hint.error { color: var(--error); }
+  .hint.success { color: var(--success); }
 </style>
 </head>
 <body>
@@ -191,6 +194,14 @@
         <div class="file-drop" data-target="xlsx_doc"><span class="text">Выберите файл (.xlsx)</span>
           <input type="file" id="xlsx_doc" name="xlsx_doc" accept=".xlsx" required>
         </div>
+        <div class="hint" id="plan-hint"></div>
+      </div>
+      <div class="field full">
+        <label for="pps_doc">Файл ППС <span class="optional">(необязательно)</span></label>
+        <div class="file-drop" data-target="pps_doc"><span class="text">Выберите файл (.xlsx)</span>
+          <input type="file" id="pps_doc" name="pps_doc" accept=".xlsx">
+        </div>
+        <div class="hint">Без него в «Руководитель программы» будет None, выделенный красным</div>
       </div>
       <div class="field full">
         <label for="template_doc">Шаблон <span class="optional">(необязательно)</span></label>
@@ -226,6 +237,36 @@ const form = document.getElementById('ked-form');
 const btn = document.getElementById('submit-btn');
 const errorMsg = document.getElementById('error-msg');
 const successMsg = document.getElementById('success-msg');
+const planInput = document.getElementById('xlsx_doc');
+const planHint = document.getElementById('plan-hint');
+const autoFields = ['year', 'program_number', 'program_name', 'program_name_kk'];
+
+planInput.addEventListener('change', async () => {
+  planHint.className = 'hint';
+  planHint.textContent = '';
+  if (!planInput.files.length) return;
+
+  planHint.textContent = 'Читаю учебный план…';
+  const fd = new FormData();
+  fd.append('xlsx_doc', planInput.files[0]);
+
+  try {
+    const res = await fetch('/parse-plan', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Не удалось прочитать учебный план.');
+
+    autoFields.forEach((name) => {
+      if (data[name] !== null && data[name] !== undefined && data[name] !== '') {
+        document.getElementById(name).value = data[name];
+      }
+    });
+    planHint.className = 'hint success';
+    planHint.textContent = 'Поля программы заполнены из учебного плана — проверьте и при необходимости поправьте.';
+  } catch (err) {
+    planHint.className = 'hint error';
+    planHint.textContent = err.message + ' Заполните поля вручную.';
+  }
+});
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -239,6 +280,10 @@ form.addEventListener('submit', async (e) => {
   const templateInput = document.getElementById('template_doc');
   if (!templateInput.files.length) {
     formData.delete('template_doc');
+  }
+  const ppsInput = document.getElementById('pps_doc');
+  if (!ppsInput.files.length) {
+    formData.delete('pps_doc');
   }
 
   try {
