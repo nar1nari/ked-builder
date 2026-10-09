@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 
 [[package]]
@@ -121,8 +121,8 @@ wheels = [
 
 [[package]]
 name = "ked-builder"
-version = "1.1.0"
-source = { git = "ssh://git@github.com/nar1nari/ked-builder.git#1b1eb99a60bbde97707a3155a18061463c3fa1cc" }
+version = "1.1.1"
+source = { git = "https://github.com/nar1nari/ked-builder.git#17fb42de3c2afb9de370a10bc7bda87c195aa3bb" }
 dependencies = [
     { name = "openpyxl" },
     { name = "python-docx" },
@@ -144,7 +144,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "ked-builder", git = "ssh://git@github.com/nar1nari/ked-builder.git" },
+    { name = "ked-builder", git = "https://github.com/nar1nari/ked-builder.git" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.53.0" },
 ]

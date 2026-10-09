@@ -23,4 +23,4 @@ requires = ["uv_build>=0.12.17,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
-ked-builder = { git = "ssh://git@github.com/nar1nari/ked-builder.git" }
+ked-builder = { git = "https://github.com/nar1nari/ked-builder.git" }
