@@ -5,13 +5,13 @@ import openpyxl
 from docx import Document
 
 from ked_builder.faculty import get_faculty_index
-from ked_builder.utils import find_table_after_heading
+from ked_builder.utils import find_table_after_heading, normalize_text
 
 
 class Course:
     def __init__(
         self,
-        name: str,
+        name: str | None = None,
         name_kk: str | None = None,
         code: str | None = None,
         code_kk: str | None = None,
@@ -311,6 +311,46 @@ def get_course_details(
 _NUMBER_PATTERN = re.compile(r"^\d+(-\d+)?$")
 
 
+def _find_prerequisite_columns(table) -> dict[str, int]:
+    """
+    Определяет индексы столбцов (семестр, номер дисциплины, название,
+    пререквизиты, постреквизиты) по тексту заголовков таблицы "Карта
+    соответствия пререквизитов и постреквизитов дисциплин".
+
+    Нужно, потому что в разных документах ОП эта таблица сделана с разным
+    числом фактических ячеек на строку (например в одних документах 10,
+    в других 6 - из-за разного объединения столбцов РУ/КZ названий), так
+    что полагаться на фиксированные индексы/количество ячеек нельзя -
+    в части документов это приводило к тому, что ни одна строка не
+    проходила проверку и пререквизиты/постреквизиты не находились вовсе.
+    """
+    columns: dict[str, int] = {}
+    header_rows = min(2, len(table.rows))
+    # Строки заголовка идут от более общей (например "Перечень дисциплин"
+    # на всю объединённую группу столбцов) к более конкретной (например
+    # "№ дисциплины" у самого столбца) - поэтому обрабатываем их в обратном
+    # порядке: конкретный подзаголовок столбца должен определять его роль,
+    # а не совпадение по общему "зонтичному" заголовку над ним.
+    for row in reversed(table.rows[:header_rows]):
+        for idx, cell in enumerate(row.cells):
+            text = normalize_text(cell.text)
+            if not text:
+                continue
+            if "семестр" in text and "semester" not in columns:
+                columns["semester"] = idx
+            elif "назван" in text and "дисциплин" in text and "name" not in columns:
+                columns["name"] = idx
+            elif "дисциплин" in text and "number" not in columns:
+                # например "№ дисциплины" - без слова "название"
+                columns["number"] = idx
+            elif "пост" in text and "реквизит" in text and "postreq" not in columns:
+                columns["postreq"] = idx
+            elif "реквизит" in text and "prereq" not in columns:
+                columns["prereq"] = idx
+
+    return columns
+
+
 def get_course_numbers(docx_path: str) -> dict[str, dict]:
     """
     Из таблицы "Карта соответствия пререквизитов и постреквизитов дисциплин"
@@ -327,27 +367,43 @@ def get_course_numbers(docx_path: str) -> dict[str, dict]:
     if table is None:
         raise ValueError("Таблица после заголовка не найдена")
 
+    columns = _find_prerequisite_columns(table)
+    required = ("semester", "number", "name", "prereq", "postreq")
+    if not all(key in columns for key in required):
+        missing = [key for key in required if key not in columns]
+        raise ValueError(
+            "Не удалось определить столбцы таблицы пререквизитов/"
+            f"постреквизитов (не найдены: {', '.join(missing)}). "
+            "Возможно, изменились заголовки таблицы в документе ОП."
+        )
+
+    def parse_list(raw: str) -> list[str]:
+        if raw in ("", "-"):
+            return []
+        return [item.strip() for item in re.split(r",\s*", raw) if item.strip()]
+
+    min_width = max(columns.values()) + 1
     entries: dict[str, dict] = {}
     for row in table.rows:
         cells = row.cells
-        if len(cells) != 10:
+        if len(cells) < min_width:
             continue  # необычная строка (например строка про диплом) - пропускаем
 
-        raw_number = cells[2].text.strip()
+        raw_number = cells[columns["number"]].text.strip()
         if not _NUMBER_PATTERN.match(raw_number):
             continue  # это строка-разделитель семестра, а не дисциплина
 
-        semester = cells[0].text.strip()
+        semester = cells[columns["semester"]].text.strip()
         number = raw_number if "-" in raw_number else f"{semester}-{raw_number}"
 
-        name = cells[3].text.strip()
-        prereq_raw = cells[6].text.strip()
-        postreq_raw = cells[8].text.strip()
-
-        def parse_list(raw: str) -> list[str]:
-            if raw in ("", "-"):
-                return []
-            return [item.strip() for item in re.split(r",\s*", raw) if item.strip()]
+        name = cells[columns["name"]].text.strip()
+        if name.isdigit():
+            # строка-сноска под таблицей вида "1 2 3 4 5 ...", нумерующая
+            # столбцы (не дисциплина - настоящее название не бывает просто
+            # числом)
+            continue
+        prereq_raw = cells[columns["prereq"]].text.strip()
+        postreq_raw = cells[columns["postreq"]].text.strip()
 
         if name and name not in entries:
             entries[name] = {

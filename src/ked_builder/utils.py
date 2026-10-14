@@ -30,11 +30,28 @@ def find_paragraph(doc: Document, needle: str):  # ty: ignore[invalid-type-form]
     return None
 
 
+_TOC_ENTRY_PATTERN = re.compile(r"\t\s*\d+\s*$")
+
+
+def _is_toc_entry(text: str) -> bool:
+    """
+    Отличает строку оглавления от настоящего заголовка раздела. В оглавлении
+    Word текст заголовка завершается табуляцией (от точечной линии) и номером
+    страницы, например "6 Сведения о дисциплинах образовательной программы\t16".
+    У настоящего заголовка раздела такого окончания нет. Без этой проверки
+    find_table_after_heading() может принять строку оглавления за сам
+    заголовок и вернуть первую попавшуюся таблицу после неё - то есть
+    совершенно не ту, что реально идёт после раздела.
+    """
+    return bool(_TOC_ENTRY_PATTERN.search(text))
+
+
 def find_table_after_heading(doc: Document, heading_text: str):  # ty: ignore[invalid-type-form]
     """
     Возвращает первую таблицу, идущую сразу после абзаца с заданным заголовком.
     Заголовок ищется не по точному совпадению, а через text_contains -
-    лишние пробелы, запятые, точки и регистр значения не имеют.
+    лишние пробелы, запятые, точки и регистр значения не имеют. Строки
+    оглавления (см. _is_toc_entry) не считаются заголовком.
     """
     heading_found = False
     for element in doc.element.body:
@@ -42,7 +59,7 @@ def find_table_after_heading(doc: Document, heading_text: str):  # ty: ignore[in
 
         if tag == "p":
             text = element.text or ""
-            if text_contains(text, heading_text):
+            if text_contains(text, heading_text) and not _is_toc_entry(text):
                 heading_found = True
 
         elif tag == "tbl" and heading_found:
